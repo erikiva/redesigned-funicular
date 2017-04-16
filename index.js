@@ -1,62 +1,74 @@
 'use strict';
 
-const { graphql, buildSchema } = require('graphql');
+const express = require('express');
+const graphqlHTTP = require('express-graphql');
+const {
+  GraphQLSchema,
+  GraphQLObjectType,
+  GraphQLID,
+  GraphQLString,
+  GraphQLInt,
+  GraphQLBoolean
+} = require('graphql');
 
-const schema = buildSchema(`
-  type Video {
-    id: ID,
-    title: String,
-    duration: Int,
-    watched: Boolean
-  }
+const {getVideoById} = require('./src/data/index')
+const PORT = process.env.PORT || 3000;
+const server = express();
 
-  type Query {
-    video: Video
-    videos: [Video]
-  }
-  
-  type Schema {
-    query: Query
-  }
-`);
-
-const videoA = {
-  id: 'a',
-  title: 'Create a GRaphQL Schema',
-  duration: 120,
-  watched: true
-}
-
-const videoB = {
-  id: 'b',
-  title: 'Create a GRaphQL Query',
-  duration: 135,
-  watched: false
-}
-
-const videos = [videoA, videoB];
-
-const resolvers = {
-  video:() => ({
-    id: () => '1',
-    title: () => 'bar',
-    duration: () => 180,
-    watched: () => true,
-  }),
-  videos: () => videos,
-}
-
-const query = `
-  query myFirstQuery{
-    videos {
-      id,
-      title,
-      duration,
-      watched
+const videoType = new GraphQLObjectType({
+  name: 'Video',
+  description: 'A video on Egghead.io',
+  fields: {
+    id: {
+      type: GraphQLID,
+      description: 'The id of the video.',
+    },
+    title: {
+      type: GraphQLString,
+      description: 'The title of the video.',
+    },
+    duration: {
+      type: GraphQLInt,
+      description: 'The duration of the video (in seconds).',
+    },
+    watched: {
+      type: GraphQLBoolean,
+      description: 'Wether or not the viewer has watched the video.'
     }
   }
-`;
+});
 
-graphql(schema, query, resolvers)
-  .then(result => {console.log(result)})
-  .catch(error => {console.log(error)});
+const queryType = new GraphQLObjectType({
+  name: 'QueryType',
+  description: 'The root of the query type.',
+  fields: {
+    video: {
+      type: videoType,
+      args: {
+        id: {
+          type: GraphQLID,
+          description: 'The id of the video',
+        }
+      },
+      resolve: (_, args) => {
+        return getVideoById(args.id);
+      }
+    },
+  }
+});
+
+const schema = new GraphQLSchema({
+  query: queryType,
+});
+
+
+server.use('/graphql', graphqlHTTP({
+  schema,
+  graphiql: true,
+}));
+
+server.listen(PORT, () => {
+  console.log(`Listening on http://localhost:${PORT}`);
+})
+
+
